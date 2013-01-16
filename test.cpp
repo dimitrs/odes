@@ -1,3 +1,5 @@
+#include "odes.h"
+
 #include <vector>
 #include <chrono>
 #include <blitz/array.h>
@@ -6,7 +8,8 @@
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/numeric/ublas/matrix_proxy.hpp>
 
-#include "odes.h"
+#include <iterator>
+
 
 
 float expected_results[11][2] = {
@@ -35,44 +38,7 @@ float expected_results_rk4[11][2] = {
     { 0.148765, 0.406575 },
     { 0.135332, 0.367884 } };
 
-
-
-struct rhs_std_vector {
-
-    template <class InputIterator, class OutputIterator>
-    OutputIterator operator()(InputIterator y, const double& t, OutputIterator yout) {
-        yout[0] = pow(y[1],2)-(2*y[0]);
-        yout[1] = y[0]-y[1]-t*pow(y[1],2);
-        return yout;
-    }
-};
-
-struct rhs_ublas {
-
-    template <class InputIterator, class OutputIterator>
-    OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
-        typedef typename std::iterator_traits<InputIterator>::value_type value_type;
-        value_type y1 = *it++;
-        value_type y2 = *it++;
-        yout[0] = pow(y2,2)-(2*y1);
-        yout[1] = y1-y2-t*pow(y2,2);
-        return yout;
-    }
-};
-
-struct rhs_c_array {
-
-    template <class InputIterator, class OutputIterator>
-    OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
-        double y1 = *it++;
-        double y2 = *it++;
-        yout[0] = pow(y2,2)-(2*y1);
-        yout[1] = y1-y2-t*pow(y2,2);
-        return yout;
-    }
-};
-
-struct rhs_blitz {
+struct func_rhs {
     template <class InputIterator, class OutputIterator>
     OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
         typedef typename std::iterator_traits<InputIterator>::value_type value_type;
@@ -85,12 +51,11 @@ struct rhs_blitz {
 };
 
 template <class Vector>
-struct func_raw {
+struct func_blitz {
     Vector operator()(const Vector& yin, const double t) {
         Vector y(2);
         y(0) = pow(yin(1),2)-(2*yin(0));
         y(1) = yin(0)-yin(1)-t*pow(yin(1),2);
-
         return y;
     }
 };
@@ -167,27 +132,19 @@ int main()
         Vector init = {0, 1};
 
         std::pair<std::vector<double>, Vector::iterator >  o =
-            runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, rhs_std_vector(), out.begin());
+            odes::runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
 
         Vector::iterator it = out.begin();
         Vector::iterator itend = o.second;
         int i = 0;
         for (; it != itend; ++it) {
-            if (fabs((*it)-expected_results_rk4[i][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results_rk4[i][1]));
-                break;
-            }
+            if (fabs((*it)-expected_results_rk4[i][0]) > 0.00001) break;
             ++it;
-            if (fabs((*it)-expected_results_rk4[i][1]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results_rk4[i][1]));
-                break;
-            }
+            if (fabs((*it)-expected_results_rk4[i][1]) > 0.00001) break;
             i++;
         }
-        if (i==nr_steps+1)
-            std::cout << "PASS: runge_kutta4 std::vector \n";
-        else
-            std::cout << "FAIL: runge_kutta4 std::vector \n";
+        if (i==nr_steps+1)  std::cout << "PASS: runge_kutta4 std::vector \n";
+        else std::cout << "FAIL: runge_kutta4 std::vector \n";
     }
 
     {  // UBLAS runge_kutta4 unit test
@@ -199,30 +156,24 @@ int main()
 
         Matrix out(nr_steps+1, nr_equations);
         std::pair<std::vector<double>, Matrix::iterator2 >  o =
-            runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, rhs_ublas(), out.begin2());
+            odes::runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, func_rhs(), out.begin2());
 
         unsigned i = 0;
         for (; i < out.size1(); ++i) {
-            if (fabs((out(i,0))-expected_results_rk4[i][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((out(i,0))), float(expected_results_rk4[i][1]));
-                break;
-            }
+            if (fabs((out(i,0))-expected_results_rk4[i][0]) > 0.00001) break;
         }
-        if (i==unsigned(nr_steps+1))
-            std::cout << "PASS: runge_kutta4 UBLAS\n";
-        else
-            std::cout << "FAIL: runge_kutta4 UBLAS\n";
+        if (i==unsigned(nr_steps+1)) std::cout << "PASS: runge_kutta4 UBLAS\n";
+        else std::cout << "FAIL: runge_kutta4 UBLAS\n";
     }
 
     { // C array runge_kutta4 unit test
         double out[nr_steps*nr_equations];
         double init[] = {0, 1};
         std::pair<std::vector<double>, double* >  o =
-            runge_kutta4(&init[0], &init[nr_equations], tmin, tmax, nr_steps, rhs_c_array(), out);
+            odes::runge_kutta4(&init[0], &init[nr_equations], tmin, tmax, nr_steps, func_rhs(), out);
         int j=0;
         for (int i=0; i < nr_steps*nr_equations; i += nr_equations, j++) {
             if (fabs((out[i])-expected_results_rk4[j][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((out[i])), float(expected_results_rk4[j][1]));
                 break;
             }
         }
@@ -240,19 +191,17 @@ int main()
         Vector out(nr_steps*nr_equations+nr_equations);
         Vector init = {0, 1};
         std::pair<std::vector<double>, Vector::iterator >  o =
-            feuler(init.begin(), init.end(), tmin, tmax, nr_steps, rhs_std_vector(), out.begin());
+            odes::feuler(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
 
         Vector::iterator it = out.begin();
         Vector::iterator itend = o.second;
         int i = 0;
         for (; it != itend; ++it) {
             if (fabs((*it)-expected_results[i][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results[i][1]));
                 break;
             }
             ++it;
             if (fabs((*it)-expected_results[i][1]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results[i][1]));
                 break;
             }
             i++;
@@ -270,19 +219,17 @@ int main()
         Vector out(nr_steps+nr_equations, nr_equations);
 
         std::pair<std::vector<double>, Vector::iterator >  o =
-            feuler(init.begin(), init.end(), tmin, tmax, nr_steps, rhs_blitz(), out.begin());
+            odes::feuler(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
 
         Vector::iterator it = out.begin();
         Vector::iterator itend = o.second;
         int i = 0;
         for (; it != itend; ++it) {
             if (fabs((*it)-expected_results[i][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results[i][1]));
                 break;
             }
             ++it;
             if (fabs((*it)-expected_results[i][1]) > 0.00001) {
-                printf("Wrong %f %f \n", float((*it)), float(expected_results[i][1]));
                 break;
             }
             i++;
@@ -297,11 +244,10 @@ int main()
         double out[nr_steps*nr_equations];
         double init[] = {0, 1};
         std::pair<std::vector<double>, double* >  o =
-            feuler(&init[0], &init[nr_equations], tmin, tmax, nr_steps, rhs_c_array(), out);
+            odes::feuler(&init[0], &init[nr_equations], tmin, tmax, nr_steps, func_rhs(), out);
         int j=0;
         for (int i=0; i < nr_steps*nr_equations; i += nr_equations, j++) {
             if (fabs((out[i])-expected_results[j][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((out[i])), float(expected_results[j][1]));
                 break;
             }
         }
@@ -320,12 +266,11 @@ int main()
 
         Matrix out(nr_steps+1, nr_equations);
         std::pair<std::vector<double>, Matrix::iterator2 >  o =
-            feuler(init.begin2(), init.end2(), tmin, tmax, nr_steps, rhs_ublas(), out.begin2());
+            odes::feuler(init.begin2(), init.end2(), tmin, tmax, nr_steps, func_rhs(), out.begin2());
 
         unsigned i = 0;
         for (; i < out.size1(); ++i) {
             if (fabs((out(i,0))-expected_results[i][0]) > 0.00001) {
-                printf("Wrong %f %f \n", float((out(i,0))), float(expected_results[i][1]));
                 break;
             }
         }
@@ -341,7 +286,7 @@ int main()
         Vector init = {0, 1};
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 900000; ++i)
-            feuler_hand_written(out, init, tmin, tmax, nr_steps, rhs_std_vector());
+            feuler_hand_written(out, init, tmin, tmax, nr_steps, func_rhs());
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
         std::cout << "feuler hand-written       time: " << elapsed.count() << '\n';
@@ -354,7 +299,7 @@ int main()
         Vector init = {0, 1};
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 900000; ++i)
-            feuler(init.begin(), init.end(), tmin, tmax, nr_steps, rhs_std_vector(), out.begin());
+            odes::feuler(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
         std::cout << "feuler std::vector        time: " << elapsed.count() << '\n';
@@ -366,7 +311,7 @@ int main()
         Vector init = {0, 1};
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 900000; ++i)
-            feuler_hand_written(out, init, tmin, tmax, nr_steps, rhs_std_vector());
+            feuler_hand_written(out, init, tmin, tmax, nr_steps, func_rhs());
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
         std::cout << "feuler hand-written       time: " << elapsed.count() << '\n';
@@ -383,7 +328,7 @@ int main()
 
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 500000; ++i)
-            runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, rhs_ublas(), out.begin2());
+            odes::runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, func_rhs(), out.begin2());
 
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
@@ -402,7 +347,7 @@ int main()
         Matrix out(nr_steps+1, nr_equations);
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 500000; ++i)
-            hand_writen_rk4(out, init, tmin, tmax, nr_steps, func_raw<Vector>());
+            hand_writen_rk4(out, init, tmin, tmax, nr_steps, func_blitz<Vector>());
 
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
@@ -416,7 +361,7 @@ int main()
         Vector init = {0, 1};
         auto start = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 500000; ++i)
-            runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, rhs_std_vector(), out.begin());
+            odes::runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
 
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;

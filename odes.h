@@ -1,23 +1,13 @@
 #ifndef ODES
 #define ODES
 
-template <class InputIterator, class OutputIterator, class T, class Time=double>
-std::pair<std::vector<Time>, OutputIterator> feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
-{
-    typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
-    return __feuler(inBegin, inEnd, x0, x1, nr_steps, f, yout, Category());
-}
+#include <vector>
+#include <utility>
+#include <algorithm>
 
+namespace odes {
 
-template <class InputIterator, class OutputIterator, class T, class Time=double>
-std::pair<std::vector<Time>, OutputIterator> runge_kutta4(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
-{
-    typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
-    return __runge_kutta4(inBegin, inEnd, x0, x1, nr_steps, f, yout, Category());
-}
-
-
-
+namespace detail {
 
 template <class InputIterator, class RandomAccessIterator, class T, class Time=double>
 std::pair<std::vector<Time>, RandomAccessIterator> __feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, RandomAccessIterator yout, std::random_access_iterator_tag)
@@ -25,8 +15,7 @@ std::pair<std::vector<Time>, RandomAccessIterator> __feuler(InputIterator inBegi
     typedef typename std::iterator_traits<InputIterator>::value_type value_type;
 
     auto delta_t = static_cast<Time>((x1-x0)/nr_steps);
-    auto nr_equations = inEnd - inBegin;
-
+    auto nr_equations = std::distance(inBegin, inEnd);
     std::copy(inBegin, inEnd, yout);
     std::vector<Time> ytime(nr_steps);
 
@@ -53,9 +42,9 @@ std::pair<std::vector<Time>, BidirectionalIterator> __feuler(InputIterator inBeg
     typedef typename std::iterator_traits<InputIterator>::value_type value_type;
 
     auto delta_t = static_cast<Time>((x1-x0)/nr_steps);
-    auto nr_equations = 0;
+    auto nr_equations = std::distance(inBegin, inEnd);
     BidirectionalIterator it = yout;
-    std::for_each(inBegin, inEnd, [&nr_equations, &yout](value_type& v){ *yout++ = v; nr_equations++; } );
+    yout = std::copy(inBegin, inEnd, yout);
     std::vector<Time> ytime(nr_steps);
 
     for (auto ii=0; ii< nr_steps; ++ii) {
@@ -78,10 +67,10 @@ std::pair<std::vector<Time>, RandomAccessIterator> __runge_kutta4(InputIterator 
 {
     typedef typename std::iterator_traits<InputIterator>::value_type value_type;
     auto delta_t = static_cast<Time>((x1-x0)/nr_steps);
-    auto nr_equations = inEnd - inBegin;
+    auto nr_equations = std::distance(inBegin, inEnd);
     yout = std::copy(inBegin, inEnd, yout);
-
     std::vector<Time> ytime(nr_steps);
+
     for (auto ii=0; ii< nr_steps; ++ii) {
         typedef typename std::vector<value_type> vec;
 
@@ -121,5 +110,24 @@ std::pair<std::vector<Time>, RandomAccessIterator> __runge_kutta4(InputIterator 
     return std::pair<std::vector<Time>, RandomAccessIterator>(ytime, yout);
 }
 
+}
+
+template <class InputIterator, class OutputIterator, class T, class Time=double>
+std::pair<std::vector<Time>, OutputIterator> feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
+{
+    typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
+    return odes::detail::__feuler(inBegin, inEnd, x0, x1, nr_steps, f, yout, Category());
+}
+
+
+template <class InputIterator, class OutputIterator, class T, class Time=double>
+std::pair<std::vector<Time>, OutputIterator> runge_kutta4(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
+{
+    typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
+    return odes::detail::__runge_kutta4(inBegin, inEnd, x0, x1, nr_steps, f, yout, Category());
+}
+
+
+}
 
 #endif
