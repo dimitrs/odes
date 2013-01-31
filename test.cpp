@@ -11,7 +11,6 @@
 #include <iterator>
 
 
-
 float expected_results[11][2] = {
     { 0, 1 },
     { 0.1, 0.9 },
@@ -37,6 +36,23 @@ float expected_results_rk4[11][2] = {
     { 0.161512, 0.449335 },
     { 0.148765, 0.406575 },
     { 0.135332, 0.367884 } };
+
+// Given differential eqn.:   y'' + 3xy' + 7y =  cos(2x)
+struct func_rhs_2 {
+    template <class InputIterator, class OutputIterator>
+    OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
+//        typedef typename std::iterator_traits<InputIterator>::value_type value_type;
+//        value_type y1 = *it++;
+//        value_type y2 = *it++;
+
+        auto y1 = *it++;
+        auto y2 = *it++;
+
+        yout[0] = y2;
+        yout[1] = -3*t*y2 - 7*y1 + cos(2*t);
+        return yout;
+    }
+};
 
 struct func_rhs {
     template <class InputIterator, class OutputIterator>
@@ -183,7 +199,33 @@ int main()
             std::cout << "FAIL: runge_kutta4 C-array\n";
     }
 
+    { // Blitz runge_kutta4 unit test
+        typedef blitz::Array<double,2> Vector;
+        Vector init(1,nr_equations);
+        init = 0, 1;
+        Vector out(nr_steps+nr_equations, nr_equations);
 
+        std::pair<std::vector<double>, Vector::iterator >  o =
+            odes::runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
+
+        Vector::iterator it = out.begin();
+        Vector::iterator itend = o.second;
+        int i = 0;
+        for (; it != itend; ++it) {
+            if (fabs((*it)-expected_results_rk4[i][0]) > 0.00001) {
+                break;
+            }
+            ++it;
+            if (fabs((*it)-expected_results_rk4[i][1]) > 0.00001) {
+                break;
+            }
+            i++;
+        }
+        if (i==nr_steps+1)
+            std::cout << "PASS: runge_kutta4 Blitz \n";
+        else
+            std::cout << "FAIL: runge_kutta4 Blitz \n";
+    }
 
     { // std::vector feuler unit test
         typedef std::vector<double> Vector;
@@ -367,6 +409,20 @@ int main()
         auto elapsed = end - start;
         std::cout << "runge_kutta4 std::vector       time: " << elapsed.count() << '\n';
     }
+
+    { // Blitz runge_kutta4 performance test
+        typedef blitz::Array<double,2> Vector;
+        Vector init(1,nr_equations);
+        init = 0, 1;
+        Vector out(nr_steps+nr_equations, nr_equations);
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 500000; ++i)
+            odes::runge_kutta4(init.begin(), init.end(), tmin, tmax, nr_steps, func_rhs(), out.begin());
+        auto end = std::chrono::high_resolution_clock::now();
+        auto elapsed = end - start;
+        std::cout << "runge_kutta4 Blitz       time: " << elapsed.count() << '\n';
+    }
+
     return 0;
 }
 
