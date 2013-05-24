@@ -114,7 +114,7 @@ std::pair<std::vector<Time>, ForwardIterator> __runge_kutta4(InputIterator inBeg
 }
 
 template <class InputIterator, class OutputIterator, class T, class Time=double>
-std::pair<std::vector<Time>, OutputIterator> feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
+std::pair<std::vector<Time>, ForwardIterator> feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, ForwardIterator yout)
 {
     typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
     return odes::detail::__feuler(inBegin, inEnd, x0, x1, nr_steps, f, yout, Category());
@@ -122,7 +122,7 @@ std::pair<std::vector<Time>, OutputIterator> feuler(InputIterator inBegin, Input
 
 
 template <class InputIterator, class OutputIterator, class T, class Time=double>
-std::pair<std::vector<Time>, OutputIterator> runge_kutta4(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, OutputIterator yout)
+std::pair<std::vector<Time>, ForwardIterator> runge_kutta4(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, ForwardIterator yout)
 {
     return odes::detail::__runge_kutta4(inBegin, inEnd, x0, x1, nr_steps, f, yout);
 }
