@@ -1,6 +1,9 @@
 #ifndef ODES
 #define ODES
 
+#include <chrono>
+#include <iostream>
+
 #include <vector>
 #include <utility>
 #include <algorithm>
@@ -33,7 +36,7 @@ std::pair<std::vector<Time>, RandomAccessIterator> __feuler(InputIterator inBegi
     }
     yout += (nr_steps*nr_equations)+nr_equations;
 
-    return std::pair<std::vector<Time>, RandomAccessIterator>(ytime, yout);
+    return std::make_pair(ytime, yout);
 }
 
 template <class InputIterator, class BidirectionalIterator, class T, class Time=double>
@@ -57,7 +60,20 @@ std::pair<std::vector<Time>, BidirectionalIterator> __feuler(InputIterator inBeg
         x0 += delta_t;
     }
 
-    return std::pair<std::vector<Time>, BidirectionalIterator>(ytime, yout);
+    return std::make_pair(ytime, yout);
+}
+
+template <size_t N> struct uint_{ };
+
+template <size_t N, typename Lambda, typename IterT>
+inline void unroller(const Lambda& f, const IterT& iter, uint_<N>) {
+    unroller(f, iter, uint_<N-1>());
+    f(iter + N);
+}
+
+template <typename Lambda, typename IterT>
+inline void unroller(const Lambda& f, const IterT& iter, uint_<0>) {
+    f(iter);
 }
 
 template <class InputIterator, class ForwardIterator, class T, class Time=double>
@@ -70,7 +86,7 @@ std::pair<std::vector<Time>, ForwardIterator> __runge_kutta4(InputIterator inBeg
     yout = std::copy(inBegin, inEnd, yout);
     std::vector<Time> ytime(nr_steps);
 
-    for (auto ii=0; ii< nr_steps; ++ii) {
+    auto rk4 = [&](const int& ii) {
         typedef typename std::vector<value_type> vec;
 
         // K1 = f(x, u(x))
@@ -102,18 +118,28 @@ std::pair<std::vector<Time>, ForwardIterator> __runge_kutta4(InputIterator inBeg
         for (auto i=0; i<nr_equations; ++i,++yout,++youtP) {
             *yout = *(youtP) + (1.0/6.0) * (k1[i] + 2.0*k2[i] + 2.0*k3[i] + k4[i]) * delta_t;
         }
+
         ytime[ii] = x0;
         x0 += delta_t;
+    };
+
+    const int UnrollFact = 1;
+    if (nr_steps % UnrollFact != 0) {
+        return std::make_pair(ytime, yout);
     }
 
-    return std::pair<std::vector<Time>, ForwardIterator>(ytime, yout);
+    for (auto ii=0; ii< nr_steps; ii+=UnrollFact) {
+        unroller(rk4, ii, uint_<UnrollFact-1>());
+    }
+
+    return std::make_pair(ytime, yout);
 }
 
 
 
 }
 
-template <class InputIterator, class OutputIterator, class T, class Time=double>
+template <class InputIterator, class ForwardIterator, class T, class Time=double>
 std::pair<std::vector<Time>, ForwardIterator> feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, ForwardIterator yout)
 {
     typedef typename std::iterator_traits<InputIterator>::iterator_category Category;
@@ -121,7 +147,7 @@ std::pair<std::vector<Time>, ForwardIterator> feuler(InputIterator inBegin, Inpu
 }
 
 
-template <class InputIterator, class OutputIterator, class T, class Time=double>
+template <class InputIterator, class ForwardIterator, class T, class Time=double>
 std::pair<std::vector<Time>, ForwardIterator> runge_kutta4(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, ForwardIterator yout)
 {
     return odes::detail::__runge_kutta4(inBegin, inEnd, x0, x1, nr_steps, f, yout);

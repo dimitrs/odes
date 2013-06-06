@@ -38,22 +38,6 @@ float expected_results_rk4[11][2] = {
     { 0.135332, 0.367884 } };
 
 // Given differential eqn.:   y'' + 3xy' + 7y =  cos(2x)
-struct func_rhs_2 {
-    template <class InputIterator, class OutputIterator>
-    OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
-//        typedef typename std::iterator_traits<InputIterator>::value_type value_type;
-//        value_type y1 = *it++;
-//        value_type y2 = *it++;
-
-        auto y1 = *it++;
-        auto y2 = *it++;
-
-        yout[0] = y2;
-        yout[1] = -3*t*y2 - 7*y1 + cos(2*t);
-        return yout;
-    }
-};
-
 struct func_rhs {
     template <class InputIterator, class OutputIterator>
     OutputIterator operator()(InputIterator it, const double& t, OutputIterator yout) {
@@ -322,18 +306,6 @@ int main()
             std::cout << "FAIL: feuler UBLAS\n";
     }
 
-    { // hand-written feuler performance test
-        typedef std::vector<double> Vector;
-        Vector out(nr_steps*nr_equations+nr_equations);
-        Vector init = {0, 1};
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < 900000; ++i)
-            feuler_hand_written(out, init, tmin, tmax, nr_steps, func_rhs());
-        auto end = std::chrono::high_resolution_clock::now();
-        auto elapsed = end - start;
-        std::cout << "feuler hand-written       time: " << elapsed.count() << '\n';
-    }
-
     { // std::vector feuler performance test
         typedef std::vector<double> Vector;
 
@@ -359,24 +331,6 @@ int main()
         std::cout << "feuler hand-written       time: " << elapsed.count() << '\n';
     }
 
-    {  // UBLAS runge_kutta4 preformance test
-        typedef boost::numeric::ublas::matrix<double> Matrix;
-
-        Matrix init(1,nr_equations);
-        init(0,0) = 0;
-        init(0,1) = 1;
-
-        Matrix out(nr_steps+1, nr_equations);
-
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < 500000; ++i)
-            odes::runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, func_rhs(), out.begin2());
-
-        auto end = std::chrono::high_resolution_clock::now();
-        auto elapsed = end - start;
-        std::cout << "runge_kutta4 ublas             time: " << elapsed.count() << '\n';
-    }
-
     {  // runge_kutta4 hand-written performance test
 
         typedef boost::numeric::ublas::matrix<double> Matrix;
@@ -398,7 +352,6 @@ int main()
 
     { // runge_kutta4 std::vector performance test
         typedef std::vector<double> Vector;
-
         Vector out(nr_steps*nr_equations+nr_equations);
         Vector init = {0, 1};
         auto start = std::chrono::high_resolution_clock::now();
@@ -421,6 +374,22 @@ int main()
         auto end = std::chrono::high_resolution_clock::now();
         auto elapsed = end - start;
         std::cout << "runge_kutta4 Blitz       time: " << elapsed.count() << '\n';
+    }
+
+    {  // UBLAS runge_kutta4 preformance test
+        typedef boost::numeric::ublas::matrix<double> Matrix;
+
+        Matrix init(1,nr_equations);
+        init(0,0) = 0;
+        init(0,1) = 1;
+
+        Matrix out(nr_steps+1, nr_equations);
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < 500000; ++i)
+            odes::runge_kutta4(init.begin2(), init.end2(), tmin, tmax, nr_steps, func_rhs(), out.begin2());
+        auto end = std::chrono::high_resolution_clock::now();
+        auto elapsed = end - start;
+        std::cout << "runge_kutta4 ublas             time: " << elapsed.count() << '\n';
     }
 
     return 0;
