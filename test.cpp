@@ -116,7 +116,6 @@ std::vector<double> hand_writen_rk4(Matrix& out, const Vector& init, double x0, 
     return ytime;
 }
 
-
 int main()
 {
     double tmin = 0.0;

@@ -39,14 +39,14 @@ std::pair<std::vector<Time>, RandomAccessIterator> __feuler(InputIterator inBegi
     return std::make_pair(ytime, yout);
 }
 
-template <class InputIterator, class BidirectionalIterator, class T, class Time=double>
-std::pair<std::vector<Time>, BidirectionalIterator> __feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, BidirectionalIterator yout, std::bidirectional_iterator_tag)
+template <class InputIterator, class ForwardIterator, class T, class Time=double>
+std::pair<std::vector<Time>, ForwardIterator> __feuler(InputIterator inBegin, InputIterator inEnd, Time x0, Time x1, int nr_steps, T f, ForwardIterator yout, std::forward_iterator_tag)
 {
     typedef typename std::iterator_traits<InputIterator>::value_type value_type;
 
     auto delta_t = static_cast<Time>((x1-x0)/nr_steps);
     auto nr_equations = std::distance(inBegin, inEnd);
-    BidirectionalIterator it = yout;
+    ForwardIterator it = yout;
     yout = std::copy(inBegin, inEnd, yout);
     std::vector<Time> ytime(nr_steps);
 
